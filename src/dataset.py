@@ -24,30 +24,63 @@ class EremusDataset(Dataset):
         splits = json.load(open(os.path.join(split_dir, f"splits_{task}.json")))
         self.samples = splits[split]
         
+
         files = []
+        labels = []
+        labels_id = []
+
         for sample in self.samples:
             #path = os.path.join(self.dataset_dir, self.subdir, sample['filename_preprocessed'])
             path = os.path.join(self.dataset_dir, self.subdir, f"{sample['id']}_eeg.{self.ext}")
+            label = sample[self.label_name]
+            labels_id.append(sample['id'])
             files.append(path)
-        files = list(set(files))
-        #self.files = {f: np.load(f)['arr_0'] for f in files}
-        if self.ext == "npy":
-            self.files = {f: np.load(f) for f in tqdm(files)}
-        elif self.ext == "fif":
-            self.files = {f: mne.io.read_raw_fif(f, preload=True).get_data() for f in tqdm(files)}
-        else:
-            raise ValueError(f"Extension {ext} not recognized")
+            labels.append(label)
+        self.datas = []
+        self.labels = []
+        self.ids = []
         
+        for idx in range(len(files)):
+            data_file = files[idx]
+            if self.ext == "npy":
+                data = np.load(data_file) 
+            elif self.ext == "fif":
+                data = mne.io.read_raw_fif(data_file, preload=True).get_data()
+            else:
+                raise ValueError(f"Extension {ext} not recognized")
+            
+            if split=='train':
+                datas = self.split_data(data)
+
+                self.datas.append(datas)
+                for _ in range(datas.shape[0]):
+                    self.labels.append(labels[idx])
+                    self.ids.append(labels_id[idx])
+            else:
+                self.datas.append(data)
+                self.labels.append(labels[idx])
+                self.ids.append(labels_id[idx])
+
+        if split=='train':
+            self.datas = np.concatenate(self.datas,axis=0)
+        # self.labels = np.array(self.labels)
+
+
+    def split_data(self,data,overlap = 128):
+        split_data = []
+        t_len = data.shape[1]
+        for i in range(0, t_len-1280, overlap):
+            split_data.append(data[:,i:i+1280])
+        return np.array(split_data)
+
     def __len__(self):
-        return len(self.samples)
+        return len(self.labels)
     
     def __getitem__(self, idx):
-        sample = self.samples[idx]
-        data = self.files[os.path.join(self.dataset_dir, self.subdir, f"{sample['id']}_eeg.{self.ext}")]
         sample = {
-            "id": sample['id'],
-            "eeg": data,
-            "label": sample[self.label_name] if "test" not in self.split else -1,
+            "id": self.ids[idx],
+            "eeg": self.datas[idx],
+            "label": self.labels[idx] if "test" not in self.split else -1,
         }
         if self.transform:
             sample = self.transform(sample)
@@ -64,7 +97,7 @@ def get_loaders(args):
     
     # Define transforms
     train_transforms = T.Compose([
-        RandomCrop(args.crop_size),
+        # RandomCrop(args.crop_size),
         ToTensor(label_interface="long"),
         Standardize()
     ])

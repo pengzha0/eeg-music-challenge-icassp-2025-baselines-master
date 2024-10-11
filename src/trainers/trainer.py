@@ -122,6 +122,8 @@ class Trainer:
                             
                         # Get inputs and labels
                         inputs = batch['eeg']
+
+                        
                         labels = batch['label']
                         
                         # Move to device

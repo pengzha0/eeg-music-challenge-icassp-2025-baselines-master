@@ -38,7 +38,7 @@ def parse():
     parser.add_argument('--use_voting', action='store_true')
     parser.add_argument('--voting_strategy', type=str, default='mean', choices=['mean', 'max', 'median', 'min', 'majority'])
     # Model options
-    parser.add_argument('--model', default='eegnet')
+    parser.add_argument('--model', default='my_eegnet')
     parser.add_argument('--verbose', action='store_true')
 
     # Mixed model-specific options
